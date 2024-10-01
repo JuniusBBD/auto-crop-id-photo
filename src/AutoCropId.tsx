@@ -6,6 +6,10 @@ import Slider from 'rc-slider';
 import 'rc-slider/assets/index.css';
 import { CascadeClassifier, Mat, RectVector } from 'mirada/dist/src/types/opencv/_types';
 
+const hdConstraints = {
+  video: {width: {exact: 1280}, height: {exact: 720}}
+};
+
 export enum ResolutionOptionType {
   AUTO,
   MAXIMUM,
@@ -167,14 +171,19 @@ export function AutoCropId() {
         break;
     }
 
+    console.log('Getting user media with constraints:', constraints);
+
     return navigator.mediaDevices
-      .getUserMedia(constraints)
+      .getUserMedia(hdConstraints)
       .then((stream) => {
         const videoTracks = stream.getVideoTracks();
+        console.log('Got video tracks:', videoTracks);
         if (videoTracks.length > 0) {
           const videoTrack = videoTracks[0];
 
           const videoTrackSettings = videoTrack.getSettings();
+
+          console.log('Video track settings:', videoTrackSettings);
           if (
             videoTrackSettings.height !== undefined &&
             videoTrackSettings.width !== undefined
@@ -196,6 +205,7 @@ export function AutoCropId() {
         return deviceInfo;
       })
       .catch(() => {
+        console.error('Error getting user media');
         return undefined;
       });
   };
@@ -215,6 +225,8 @@ export function AutoCropId() {
         ideal: deviceInfo.video.captureResolution.height,
       };
     }
+
+    console.log('Video constraints:', videoConstraints);
 
     return videoConstraints;
   };
@@ -260,7 +272,7 @@ export function AutoCropId() {
     }
   }, [factor_]);
 
-  const processImage = (imageSrc: string, factor: number) => {
+  const processImage = (imageSrc: string, factor = 0.25) => {
     // if (!opencvReady) {
     //  setStatus('OpenCV not ready.');
     //   return;
@@ -440,8 +452,9 @@ export function AutoCropId() {
       if (devices.length > 0) {
         const deviceId = devices[0].deviceId;
         getCurrentDeviceInfo(deviceId, {
-          type: ResolutionOptionType.AUTO,
+          type: ResolutionOptionType.MAXIMUM,
         }).then((currentDeviceInfoNew) => {
+          console.log('Current device info:', currentDeviceInfoNew);
           if (currentDeviceInfoNew) {
             setCurrentDeviceInfo(currentDeviceInfoNew);
           }
