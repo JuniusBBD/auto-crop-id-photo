@@ -2,6 +2,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import Webcam, { WebcamProps } from 'react-webcam';
 import 'mirada/dist/src/types/opencv/_types';
 import Poster from './assets/poster.svg';
+import Slider from 'rc-slider';
+import 'rc-slider/assets/index.css';
 import { CascadeClassifier, Mat, RectVector } from 'mirada/dist/src/types/opencv/_types';
 
 export enum ResolutionOptionType {
@@ -92,6 +94,7 @@ export function AutoCropId() {
   const [currentDeviceInfo, setCurrentDeviceInfo] = useState<DeviceInfo | null>(
     null
   );
+  const [factor_, setFactor] = useState<number>(0.25);
   const [processedImage, setProcessedImage] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[] | null>(null);
   const [processedImageInfo, setProcessedImageInfo] = useState<{
@@ -251,13 +254,13 @@ export function AutoCropId() {
     const imageSrc = webcamRef.current?.getScreenshot();
     if (imageSrc) {
       setCapturedImage(imageSrc);
-      processImage(imageSrc);
+      processImage(imageSrc, factor_);
       const imageSize = calculateBase64ImageSize(imageSrc);
       setImageSize(imageSize);
     }
-  }, []);
+  }, [factor_]);
 
-  const processImage = (imageSrc: string) => {
+  const processImage = (imageSrc: string, factor: number) => {
     // if (!opencvReady) {
     //  setStatus('OpenCV not ready.');
     //   return;
@@ -265,7 +268,6 @@ export function AutoCropId() {
 
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const factor = 0.25;
     const minNeighbors = 5;
     const ctx = canvas.getContext('2d');
     const image = new Image();
@@ -522,7 +524,11 @@ export function AutoCropId() {
           )}
           <Webcam poster={Poster} ref={webcamRef} {...getWebcamProps()} />
           <br />
-
+         <div className='mb-3 w-52'>
+         <p>{`Factor: ${factor_}`}</p>
+         <Slider defaultValue={0.25} onChange={val => {
+          setFactor(val as number)}} min={0} step={0.05} max={1} />
+         </div>
           <button
             onClick={() => capture(webcamRef)}
             className='inline-flex items-center justify-center h-12 gap-2 px-6 text-sm font-medium tracking-wide text-white transition duration-300 rounded whitespace-nowrap bg-emerald-500 hover:bg-emerald-600 focus:bg-emerald-700 focus-visible:outline-none disabled:cursor-not-allowed disabled:border-emerald-300 disabled:bg-emerald-300 disabled:shadow-none'
