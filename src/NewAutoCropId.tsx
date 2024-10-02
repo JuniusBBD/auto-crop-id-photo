@@ -94,6 +94,7 @@ type SelfieCameraProps = {
   setResolution?: (resolution: { width?: number; height?: number }) => void;
   cameraInfo?: DeviceInfo | null;
   setCameraInfo?: (cameraInfo: DeviceInfo | null) => void;
+  retake?: boolean;
 };
 
 // const loadOpenCV = (): Promise<void> => {
@@ -224,7 +225,7 @@ export function NewAutoCropId(props: SelfieCameraProps) {
 
           if (result.face.length > 0) {
             const { box } = result.face[0];
-             
+
             const [, , width, height] = box;
             const faceArea = width * height;
             const frameArea = img.width * img.height;
@@ -523,7 +524,7 @@ export function NewAutoCropId(props: SelfieCameraProps) {
         console.error('No video devices found');
       }
     }
-  }, [devices, constraintIndex]);
+  }, [devices, constraintIndex, props.retake]);
 
   return (
     <div className='flex flex-col items-center p-5'>

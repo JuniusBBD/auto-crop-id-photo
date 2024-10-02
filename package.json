@@ -10,7 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@techstark/opencv-js": "4.10.0-release.1",
+    "@tensorflow-models/blazeface": "^0.1.0",
+    "@tensorflow-models/face-landmarks-detection": "^1.0.5",
+    "@tensorflow/tfjs": "^4.21.0",
     "@vladmandic/human": "^3.3.2",
+    "face-api.js": "^0.22.2",
     "mirada": "^0.0.15",
     "rc-slider": "^11.1.6",
     "react": "^18.3.1",

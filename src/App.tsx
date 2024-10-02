@@ -1,18 +1,33 @@
-import React from 'react'
+import React from 'react';
 // import { AutoCropId } from './AutoCropId'
-import { NewAutoCropId } from './NewAutoCropId'
+import { DeviceInfo, NewAutoCropId } from './NewAutoCropId';
+import { SelfieCamera } from './SelfieCamera';
 
 function App() {
-
-  const [screenshot, setScreenshot] = React.useState<string>()
+  const [screenshot, setScreenshot] = React.useState<string>();
+  const [cameraInfo, setCameraInfo] = React.useState<DeviceInfo | null>(null);
+  const [retake, setRetake] = React.useState<boolean>(false);
 
   return (
     <>
       {/* <AutoCropId /> */}
-      <NewAutoCropId screenshot={screenshot} setScreenshot={setScreenshot} />
-      <button onClick={() => setScreenshot('')}>Reset</button>
+      <SelfieCamera
+        retake={retake}
+        screenshot={screenshot}
+        cameraInfo={cameraInfo}
+        setCameraInfo={setCameraInfo}
+        setScreenshot={setScreenshot}
+      />
+      <button
+        onClick={() => {
+          setScreenshot('');
+          setRetake(true);
+        }}
+      >
+        Reset
+      </button>
     </>
-  )
+  );
 }
 
-export default App
+export default App;
