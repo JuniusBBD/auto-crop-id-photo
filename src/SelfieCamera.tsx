@@ -1,5 +1,5 @@
 import React from 'react';
-import cv, { CascadeClassifier, Mat, RectVector } from '@techstark/opencv-js';
+import cv, { CascadeClassifier, Mat, RectVector } from "@techstark/opencv-js";
 import { Human } from '@vladmandic/human';
 // import { CascadeClassifier, Mat, RectVector } from 'mirada';
 import { loadHaarFaceModels } from './utils/haarFaceDetection';
@@ -504,7 +504,7 @@ export function SelfieCamera(props: SelfieCameraProps) {
   }, []);
 
   return (
-    <div className='flex flex-col items-center p-5'>
+      <div className='flex flex-col items-center p-5'>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       {props.screenshot && (
         <div className='relative mb-5 overflow-hidden w-75 h-100 '>
@@ -514,13 +514,50 @@ export function SelfieCamera(props: SelfieCameraProps) {
           /> */}
         </div>
       )}
-      <video
-        // width={300}
-        // height={400}
-        // className='object-cover w-full h-full rounded-full'
-        autoPlay
-        ref={videoRef}
-      />
+      {!props.screenshot && (
+        <div className='relative w-full h-auto mb-5 overflow-hidden md:w-75 md:h-100 rounded-1/2'>
+          <video
+            // width={300}
+            // height={400}
+            className='object-cover w-full h-full rounded-full'
+            autoPlay
+            ref={videoRef}
+          />
+          <div
+            className={`absolute top-0 left-0 w-full h-full rounded-1/2 border-8 ${borderColor}`}
+          />
+          {message && (
+            <div className='text-black absolute bottom-[40px] p-2 rounded-md bg-opacity-40 bg-white right-[120px]'>
+              <p>{message}</p>
+            </div>
+          )}
+        </div>
+      )}
+      {/* Canvas (hidden, used to capture image) */}
+
+      {/* Button to capture screenshot */}
+      <div className='flex flex-col items-center gap-3 text-black-pure'>
+        <p className='text-3xl'>
+          {props.screenshot ? 'Is it clear enough?' : `Take a selfie ${props.cameraInfo?.video.captureResolution?.width}`}
+        </p>
+        <p className='text-base'>
+          {props.screenshot
+            ? 'Make sure your entire face is visible'
+            : 'Place your face in the oval. Take picture when the button turns green.'}
+        </p>
+        {!props.screenshot && (
+          <button
+            onClick={() => isFaceWithinFrame && captureScreenshot()}
+            className={`border  ${
+              isFaceWithinFrame
+                ? 'bg-lime-600 border-lime-600 active:bg-lime-800'
+                : 'bg-grey-300 border-grey-300'
+            } w-22.5 h-22.5 rounded-full`}
+          >
+            <div className='w-full h-full border-2 border-white rounded-full' />
+          </button>
+        )}
+      </div>
     </div>
-  );
+  )
 }
