@@ -1,12 +1,18 @@
 import React from 'react';
-import cv, { CascadeClassifier, Mat, RectVector } from "@techstark/opencv-js";
+import cv, { CascadeClassifier, Mat, RectVector } from '@techstark/opencv-js';
 import { Human } from '@vladmandic/human';
-// import { CascadeClassifier, Mat, RectVector } from 'mirada';
+import Poster from './assets/poster.svg';
 import { loadHaarFaceModels } from './utils/haarFaceDetection';
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 window.cv = cv;
+
+type SelfieInfo = {
+  width: number;
+  height: number;
+  size: number;
+};
 
 type SelfieCameraProps = {
   screenshot?: string;
@@ -18,8 +24,7 @@ type SelfieCameraProps = {
     height?: number;
   };
   setResolution?: (resolution: { width?: number; height?: number }) => void;
-  cameraInfo?: DeviceInfo | null;
-  setCameraInfo?: (cameraInfo: DeviceInfo | null) => void;
+  selfieInfo?: (selfieInfo: SelfieInfo) => void;
   retake?: boolean;
 };
 
@@ -30,51 +35,6 @@ type VideoConstraints = {
     };
     height: {
       exact: number;
-    };
-  };
-};
-
-export enum ResolutionOptionType {
-  AUTO,
-  MAXIMUM,
-  NEAREST,
-}
-
-export type AutoResolution = {
-  type: ResolutionOptionType.AUTO;
-};
-
-export type MaximumResolution = {
-  type: ResolutionOptionType.MAXIMUM;
-};
-
-export type NearestResolution = {
-  type: ResolutionOptionType.NEAREST;
-  width: number;
-  height: number;
-};
-
-export type ImageCaptureResolutionHint =
-  | NearestResolution
-  | MaximumResolution
-  | AutoResolution;
-
-export enum ImageMirrorBehavior {
-  FLIP_WHEN_USER_FACING,
-  NO_FLIPPING,
-}
-
-export type DeviceInfo = {
-  deviceId: string;
-  video: {
-    isFacingUser?: boolean;
-    captureResolution?: {
-      width: number;
-      height: number;
-    };
-    displayResolution?: {
-      width: number;
-      height: number;
     };
   };
 };
@@ -105,77 +65,12 @@ const constraints: VideoConstraints[] = [
 
 export function SelfieCamera(props: SelfieCameraProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  let videoStream: MediaStream | null = null;
   const [isFaceWithinFrame, setIsFaceWithinFrame] = React.useState(false);
   const [message, setMessage] = React.useState('');
   const [borderColor, setBorderColor] = React.useState('border-red-500');
-  const [constraintIndex, setConstraintIndex] = React.useState(5);
+  const [stream, setStream] = React.useState<MediaStream | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
-  const [devices, setDevices] = React.useState<MediaDeviceInfo[] | null>(null);
 
-  const handleDevices = React.useCallback((mediaDevices: MediaDeviceInfo[]) => {
-    const devicesNew = mediaDevices.filter(({ kind }) => kind === 'videoinput');
-    setDevices(devicesNew);
-  }, []);
-
-  const getCurrentDeviceInfo = async (
-    deviceId: string
-  ): Promise<DeviceInfo | undefined> => {
-    const deviceInfo: DeviceInfo = {
-      deviceId: deviceId,
-      video: {},
-    };
-    const currentConstraints = constraints[constraintIndex];
-    const camConstraints: MediaStreamConstraints = {
-      audio: false,
-      video: {
-        deviceId: deviceId,
-        ...currentConstraints.video,
-      },
-    };
-
-    return navigator.mediaDevices
-      .getUserMedia(camConstraints)
-      .then((stream) => {
-        if (stream) {
-          if (props.setResolution) {
-            const videoTrack = stream.getVideoTracks()[0];
-            const { width, height } = videoTrack.getSettings();
-            props.setResolution({ width, height });
-          }
-          videoStream = stream;
-          videoRef.current!.srcObject = stream;
-        }
-
-        const videoTracks = stream.getVideoTracks();
-        if (videoTracks.length > 0) {
-          const videoTrack = videoTracks[0];
-
-          const videoTrackSettings = videoTrack.getSettings();
-          if (
-            videoTrackSettings.height !== undefined &&
-            videoTrackSettings.width !== undefined
-          ) {
-            deviceInfo.video.captureResolution = {
-              height: videoTrackSettings.height,
-              width: videoTrackSettings.width,
-            };
-          }
-
-          if (videoTrackSettings.facingMode !== undefined) {
-            deviceInfo.video.isFacingUser =
-              videoTrackSettings.facingMode.indexOf('user') >= 0;
-          }
-
-          // stream.getTracks().forEach((track) => track.stop());
-        }
-
-        return deviceInfo;
-      })
-      .catch(() => {
-        throw new Error("Couldn't get user media");
-      });
-  };
 
   const detectFace = async (h: Human) => {
     const video = videoRef.current;
@@ -243,8 +138,6 @@ export function SelfieCamera(props: SelfieCameraProps) {
               faceArea / frameArea > 0.2 &&
               faceArea / frameArea <= 0.8 &&
               isFacingForward &&
-              // isMouthVisible &&
-              // eyesVisible &&
               !wristsVisible
             ) {
               setBorderColor('border-lime-500');
@@ -259,18 +152,21 @@ export function SelfieCamera(props: SelfieCameraProps) {
               setMessage('Too close');
               setIsFaceWithinFrame(false);
             }
+          } else {
+            setMessage('No face detected');
           }
         };
       }
     }
   };
 
-  const processImage = (imageSrc: string, factor = 0.25) => {
-    // if (!opencvReady) {
-    //  setStatus('OpenCV not ready.');
-    //   return;
-    // }
+  const calculateBase64ImageSize = (base64String: string): number => {
+    const stringLength = base64String.length;
+    const sizeInBytes = 4 * Math.ceil(stringLength / 3) * 0.5624896334383812;
+    return sizeInBytes; // Size in bytes
+  };
 
+  const processImage = (imageSrc: string, factor = 0.25) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const minNeighbors = 5;
@@ -281,7 +177,6 @@ export function SelfieCamera(props: SelfieCameraProps) {
     image.onload = async () => {
       canvas.width = image.width;
       canvas.height = image.height;
-      console.log('Image dimension:', image.width, image.height);
       if (!ctx) return;
 
       ctx.drawImage(image, 0, 0, image.width, image.height);
@@ -294,38 +189,16 @@ export function SelfieCamera(props: SelfieCameraProps) {
       const src = cv.matFromImageData(imageData);
 
       try {
-        // setStatus('Processing image...');
         gray = new cv.Mat();
         cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
         faces = new cv.RectVector();
         faceCascade = new cv.CascadeClassifier();
-
-        // Fetch Haar Cascade file and load it into OpenCV
-        // const response = await fetch('haarcascade_frontalface_default.xml');
-        // const xmlText = await response.text();
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        // cv.FS_createDataFile(
-        //   '/',
-        //   'haarcascade_frontalface_default.xml',
-        //   xmlText,
-        //   true,
-        //   true
-        // );
         faceCascade.load('haarcascade_frontalface_default.xml');
 
         // Face detection
         const srcWidth = src.size().width;
         const srcHeight = src.size().height;
         const srcMin = Math.min(srcWidth, srcHeight);
-
-        console.log(
-          'Image size:',
-          srcWidth,
-          srcHeight,
-          srcWidth * 0.05,
-          srcHeight * 0.05
-        );
 
         const minSize = new cv.Size(srcMin * 0.05, srcMin * 0.05);
         const maxSize = new cv.Size(0, 0);
@@ -342,8 +215,6 @@ export function SelfieCamera(props: SelfieCameraProps) {
         if (faces.size() === 0) {
           throw new Error('No faces detected');
         }
-
-        console.log('Face detected:', faces.size());
 
         // Crop the first detected face
         const face = faces.get(0);
@@ -375,8 +246,8 @@ export function SelfieCamera(props: SelfieCameraProps) {
 
         const canvas = canvasRef.current;
         if (canvas) {
-          canvas.width = point2.x - point1.x; // Adjusted faceWidth
-          canvas.height = point2.y - point1.y; // Adjusted faceHeight
+          canvas.width = point2.x - point1.x;
+          canvas.height = point2.y - point1.y;
 
           // Create a canvas to show the cropped face
           const processedCanvas = document.createElement('canvas');
@@ -388,24 +259,18 @@ export function SelfieCamera(props: SelfieCameraProps) {
           const processedImageSrc = processedCanvas.toDataURL('image/jpeg');
           props.setScreenshot(processedImageSrc);
 
-          if (videoStream) {
-            videoStream.getVideoTracks().forEach((track) => track.stop());
-          }
-
-          // const sizeInBytes = calculateBase64ImageSize(processedImageSrc);
-          // const sizeInKB = sizeInBytes / 1024;
-          // setProcessedImageInfo({
-          //   width: processedCanvas.width,
-          //   height: processedCanvas.height,
-          //   size: sizeInKB,
-          // });
+          // This will be used to log the image size, width, and height
+          const sizeInBytes = calculateBase64ImageSize(processedImageSrc);
+          const sizeInKB = sizeInBytes / 1024;
+          props.selfieInfo?.({
+            width: processedCanvas.width,
+            height: processedCanvas.height,
+            size: sizeInKB,
+          });
         }
 
-        // setStatus('Face detected and cropped.');
-        // setHasFace(true);
       } catch (e) {
         console.error(e);
-        // setStatus((e as Error).message);
       } finally {
         // Clean up memory
         image?.remove();
@@ -422,31 +287,17 @@ export function SelfieCamera(props: SelfieCameraProps) {
       const canvas = canvasRef.current;
       const video = videoRef.current;
 
-      // Set canvas dimensions to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
       const context = canvas.getContext('2d', { willReadFrequently: true });
       if (context) {
-        // Draw the current frame from the video onto the canvas
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        // Convert the canvas content to a data URL (image)
         const dataUrl = canvas.toDataURL('image/jpeg');
-        processImage(dataUrl); // Save image data URL to state
+        processImage(dataUrl);
       }
     }
   };
-
-  // React.useEffect(() => {
-  //   // Load OpenCV.js and run the detection once OpenCV is ready
-  //   loadOpenCV()
-  //     .then(() => {
-  //       // setOpencvReady(true);
-  //       console.log('OpenCV.js loaded.');
-  //       // setStatus('Camera ready.');
-  //     })
-  //     .catch(console.error);
-  // }, []);
 
   React.useEffect(() => {
     const loadHuman = async () => {
@@ -461,50 +312,47 @@ export function SelfieCamera(props: SelfieCameraProps) {
 
     loadHuman().then((h) => {
       console.log('Human loaded');
-      interval = setInterval(() => detectFace(h), 500);
+      interval = setInterval(() => detectFace(h), 300);
     });
 
     return () => clearInterval(interval);
   }, []);
 
   React.useEffect(() => {
-    navigator.mediaDevices.enumerateDevices().then(handleDevices);
-  }, [handleDevices]);
-
-  React.useEffect(() => {
-    if (devices) {
-      if (props.setCameraInfo) {
-        props.setCameraInfo(null);
-      }
-      if (devices.length > 0) {
-        const deviceId = devices[0].deviceId;
-        getCurrentDeviceInfo(deviceId)
-          .then((currentDeviceInfoNew) => {
-            if (currentDeviceInfoNew && props.setCameraInfo) {
-              props.setCameraInfo(currentDeviceInfoNew);
-            }
-          })
-          .catch((error) => {
-            if (
-              error &&
-              (error as Error).message === "Couldn't get user media"
-            ) {
-              console.log('Error getting user media');
-              setConstraintIndex(constraintIndex - 1);
-            }
-          });
-      } else {
-        console.error('No video devices found');
-      }
-    }
-  }, [devices, constraintIndex, props.retake]);
-
-  React.useEffect(() => {
     loadHaarFaceModels();
   }, []);
 
+  const startCameraWithConstraints = React.useCallback(async () => {
+    const reversedConstraints = [...constraints].reverse();
+
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+
+    for (let i = 0; i < reversedConstraints.length; i++) {
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia(reversedConstraints[i]);
+        setStream(newStream);
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = newStream;
+          videoRef.current.play();
+        }
+        return;
+      } catch (err) {
+        console.warn(`Failed to apply constraint ${i}:`, reversedConstraints[i], err);
+      }
+    }
+
+    throw new Error('Failed to start camera with any of the given constraints.');
+  }, []);
+
+  React.useEffect(() => {
+    startCameraWithConstraints();
+  }, [startCameraWithConstraints]);
+
   return (
-      <div className='flex flex-col items-center p-5'>
+    <div className='flex flex-col items-center p-5'>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       {props.screenshot && (
         <div className='relative mb-5 overflow-hidden w-75 h-100 '>
@@ -517,10 +365,13 @@ export function SelfieCamera(props: SelfieCameraProps) {
       {!props.screenshot && (
         <div className='relative w-full h-auto mb-5 overflow-hidden md:w-75 md:h-100 rounded-1/2'>
           <video
-            // width={300}
-            // height={400}
-            className='object-cover w-full h-full rounded-full'
+            width={300}
+            height={400}
+            poster={Poster}
+            className='object-cover w-[70vh] h-[70vh] md:w-full md:h-full rounded-full'
             autoPlay
+            muted
+            playsInline
             ref={videoRef}
           />
           <div
@@ -533,12 +384,12 @@ export function SelfieCamera(props: SelfieCameraProps) {
           )}
         </div>
       )}
-      {/* Canvas (hidden, used to capture image) */}
 
-      {/* Button to capture screenshot */}
       <div className='flex flex-col items-center gap-3 text-black-pure'>
         <p className='text-3xl'>
-          {props.screenshot ? 'Is it clear enough?' : `Take a selfie ${props.cameraInfo?.video.captureResolution?.width}`}
+          {props.screenshot
+            ? 'Is it clear enough?'
+            : 'Take a selfie'}
         </p>
         <p className='text-base'>
           {props.screenshot
@@ -559,5 +410,5 @@ export function SelfieCamera(props: SelfieCameraProps) {
         )}
       </div>
     </div>
-  )
+  );
 }
