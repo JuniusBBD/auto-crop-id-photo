@@ -271,6 +271,7 @@ export function SelfieCamera(props: SelfieCameraProps) {
 
       } catch (e) {
         console.error(e);
+        alert((e as Error).message);
       } finally {
         // Clean up memory
         image?.remove();
